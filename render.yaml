@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sports-quiz-server
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        value: https://iridescent-rabanadas-c15199.netlify.app
