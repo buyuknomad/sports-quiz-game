@@ -1,4 +1,4 @@
-// Production-ready Express server with proper error handling and security
+// Enhanced production server with security and performance optimizations
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -6,7 +6,11 @@ import cors from 'cors';
 import { nanoid } from 'nanoid';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import helmet from 'helmet';
+import compression from 'compression';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,7 +51,23 @@ const serializeGameState = (game) => {
 const app = express();
 const httpServer = createServer(app);
 
-// Configure CORS based on environment
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Compression middleware
+app.use(compression());
+
 const corsOrigin = process.env.NODE_ENV === 'production'
   ? process.env.CLIENT_URL || true
   : "http://localhost:5173";
@@ -64,7 +84,6 @@ const io = new Server(httpServer, {
   pingInterval: 25000
 });
 
-// Security middleware
 app.use(cors({
   origin: corsOrigin,
   credentials: true
@@ -72,11 +91,9 @@ app.use(cors({
 
 app.use(express.json());
 
-// Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(join(__dirname, 'dist')));
   
-  // Handle SPA routing
   app.get('*', (req, res) => {
     res.sendFile(join(__dirname, 'dist', 'index.html'));
   });
@@ -85,12 +102,6 @@ if (process.env.NODE_ENV === 'production') {
     res.json({ status: 'Server is running' });
   });
 }
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
 
 const activeGames = new Map();
 
@@ -479,8 +490,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server with proper port configuration
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });

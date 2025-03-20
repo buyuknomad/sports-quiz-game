@@ -12,24 +12,25 @@
     "create-deploy": "node scripts/create-deploy-package.js"
   },
   "dependencies": {
-    "lucide-react": "^0.344.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zustand": "^4.5.2",
-    "nanoid": "^5.0.6",
-    "express": "^4.18.3",
-    "cors": "^2.8.5",
-    "socket.io": "^4.7.4",
-    "socket.io-client": "^4.7.4",
-    "cross-env": "^7.0.3",
-    "dotenv": "^16.4.5",
     "archiver": "^6.0.1",
     "canvas-confetti": "^1.9.2",
-    "compression": "^1.7.4",
-    "helmet": "^7.1.0"
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "helmet": "^7.2.0",
+    "lucide-react": "^0.344.0",
+    "nanoid": "^5.0.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io": "^4.7.4",
+    "socket.io-client": "^4.7.4",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/canvas-confetti": "^1.6.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
@@ -43,8 +44,7 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2",
-    "@types/canvas-confetti": "^1.6.4"
+    "vite": "^5.4.2"
   },
   "engines": {
     "node": ">=18.0.0"

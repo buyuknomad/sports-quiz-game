@@ -9,3 +9,11 @@ services:
         value: production
       - key: CLIENT_URL
         value: https://iridescent-rabanadas-c15199.netlify.app
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: tmp
+      mountPath: /tmp
+      sizeGB: 1
