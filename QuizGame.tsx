@@ -1,9 +1,10 @@
-// Main quiz game component with single and multiplayer game handling
-import React, { useState, useEffect, useCallback } from 'react';
-import { useGameStore, quickChatMessages } from '../store/gameStore';
-import { Timer, AlertCircle, MessageSquare, X } from 'lucide-react';
+// Main quiz game component with improved score tracking and concurrency fixes
+import React, { useState, useEffect, useCallback, startTransition } from 'react';
+import { useGameStore } from '../store/gameStore';
+import { quickChatMessages } from '../constants/chat';
+import { Timer, AlertCircle, MessageCircle, X, Clock } from 'lucide-react';
 
-export const QuizGame: React.FC = () => {
+const QuizGame: React.FC = () => {
   const { 
     timeRemaining, 
     setTimeRemaining, 
@@ -15,7 +16,11 @@ export const QuizGame: React.FC = () => {
     chatMessages,
     addChatMessage,
     isGameEnded,
-    submitAnswer
+    submitAnswer,
+    isTransitioning,
+    setIsTransitioning,
+    getCurrentPlayer,
+    getPlayerResponseTimes
   } = useGameStore();
   
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -23,40 +28,80 @@ export const QuizGame: React.FC = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [localTime, setLocalTime] = useState(15);
   const [showChat, setShowChat] = useState(false);
+  const [isButtonEnabled, setIsButtonEnabled] = useState(true);
+  const [earnedPoints, setEarnedPoints] = useState(0);
   
-  const currentPlayer = players[0];
+  const currentPlayer = getCurrentPlayer();
   const question = questions[currentQuestion];
   const isMultiplayer = mode === '1v1' || mode === 'multiplayer';
 
-  const handleAnswerSelect = useCallback((answer: string) => {
-    if (isAnswerChecked || !currentPlayer) return;
+  // Get response times for current player
+  const currentPlayerResponseTimes = currentPlayer ? getPlayerResponseTimes(currentPlayer.id) : [];
+  const lastResponseTime = currentPlayerResponseTimes[currentPlayerResponseTimes.length - 1];
+  const totalResponseTime = currentPlayerResponseTimes.reduce((sum, time) => sum + time, 0);
+
+  useEffect(() => {
+    console.log('Question changed, resetting state:', {
+      currentQuestion,
+      questionContent: question?.question
+    });
     
+    startTransition(() => {
+      setIsButtonEnabled(true);
+      setSelectedAnswer(null);
+      setIsAnswerChecked(false);
+      setIsCorrect(false);
+      setLocalTime(15);
+      setEarnedPoints(0);
+    });
+  }, [currentQuestion, question]);
+
+  const handleAnswerSelect = useCallback((answer: string) => {
+    if (!isButtonEnabled || !currentPlayer) return;
+    
+    setIsButtonEnabled(false);
     setSelectedAnswer(answer);
     const correct = checkAnswer(answer);
     setIsCorrect(correct);
     setIsAnswerChecked(true);
-    
-    submitAnswer(answer, localTime);
-  }, [currentPlayer, localTime, isAnswerChecked, checkAnswer, submitAnswer]);
+
+    // Calculate earned points
+    let points = 0;
+    if (correct) {
+      points = 10 + Math.floor(localTime / 3);
+    }
+    setEarnedPoints(points);
+
+    // Get current total score and calculate new total
+    const currentScore = currentPlayer.score || 0;
+    const newTotalScore = currentScore + points;
+
+    // Submit answer with new total score
+    startTransition(() => {
+      submitAnswer(answer, localTime, points, newTotalScore);
+    });
+  }, [currentPlayer, localTime, checkAnswer, submitAnswer, isButtonEnabled]);
 
   const handleTimeUp = useCallback(() => {
-    if (!isAnswerChecked) {
+    if (!isAnswerChecked && isButtonEnabled && currentPlayer) {
+      setIsButtonEnabled(false);
       setIsAnswerChecked(true);
       setIsCorrect(false);
-      submitAnswer('', 0);
+      setEarnedPoints(0);
+      
+      // When time is up, no points are earned
+      const currentScore = currentPlayer.score || 0;
+      startTransition(() => {
+        submitAnswer('', 0, 0, currentScore);
+      });
     }
-  }, [isAnswerChecked, submitAnswer]);
+  }, [isAnswerChecked, submitAnswer, isButtonEnabled, currentPlayer]);
 
-  const handleQuickChat = (message: string) => {
-    if (currentPlayer) {
-      addChatMessage(currentPlayer.id, message);
-    }
-  };
-
-  // Timer effect
   useEffect(() => {
-    if (!isAnswerChecked && !isGameEnded) {
-      const timer = setInterval(() => {
+    let timer: NodeJS.Timeout;
+
+    if (!isAnswerChecked && !isGameEnded && isButtonEnabled) {
+      timer = setInterval(() => {
         setLocalTime((prev) => {
           const newTime = prev - 1;
           if (newTime <= 0) {
@@ -70,34 +115,27 @@ export const QuizGame: React.FC = () => {
 
       return () => clearInterval(timer);
     }
-  }, [isAnswerChecked, handleTimeUp, isGameEnded]);
+  }, [isAnswerChecked, handleTimeUp, isGameEnded, isButtonEnabled]);
 
   useEffect(() => {
-    setTimeRemaining(localTime);
+    startTransition(() => {
+      setTimeRemaining(localTime);
+    });
   }, [localTime, setTimeRemaining]);
 
-  // Reset state for next question
-  useEffect(() => {
-    setSelectedAnswer(null);
-    setIsAnswerChecked(false);
-    setIsCorrect(false);
-    setLocalTime(15);
-  }, [currentQuestion]);
+  const getResponseTimeColor = (time: number) => {
+    if (time < 3) return 'text-green-400';
+    if (time < 7) return 'text-yellow-400';
+    return 'text-orange-400';
+  };
 
-  if (!question) return null;
+  if (isGameEnded || !question) return null;
 
   const timerWidth = `${(localTime / 15) * 100}%`;
   const questionNumber = currentQuestion + 1;
 
-  const getFeedbackMessage = () => {
-    if (!isAnswerChecked) return '';
-    if (!isCorrect) return `Time's up! The correct answer was ${question.correctAnswer}`;
-    return `Correct! +${10 + Math.floor(localTime / 3)} points`;
-  };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-900">
-      {/* Multiplayer scoreboard */}
       {isMultiplayer && (
         <div className="w-full max-w-2xl mb-6 bg-gray-800 rounded-lg p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -111,14 +149,13 @@ export const QuizGame: React.FC = () => {
                 <span className="text-white font-medium truncate">
                   {player.username}
                 </span>
-                <span className="text-white font-bold">{player.score}</span>
+                <span className="text-white font-bold">{player.score || 0}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Timer and progress */}
       <div className="w-full max-w-2xl mb-8">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-gray-400">
@@ -137,7 +174,6 @@ export const QuizGame: React.FC = () => {
         </div>
       </div>
 
-      {/* Question card */}
       <div className="w-full max-w-2xl bg-gray-800 rounded-2xl p-8 shadow-xl">
         <h2 className="text-2xl font-bold text-white mb-8">
           {question.question}
@@ -160,8 +196,8 @@ export const QuizGame: React.FC = () => {
             return (
               <button
                 key={option}
-                onClick={() => !isAnswerChecked && handleAnswerSelect(option)}
-                disabled={isAnswerChecked}
+                onClick={() => handleAnswerSelect(option)}
+                disabled={!isButtonEnabled}
                 className={buttonClass}
               >
                 {option}
@@ -170,28 +206,40 @@ export const QuizGame: React.FC = () => {
           })}
         </div>
 
-        {/* Feedback message */}
         {isAnswerChecked && (
-          <div className={`mt-6 flex items-center gap-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-            <AlertCircle size={20} />
-            <span>{getFeedbackMessage()}</span>
+          <div className="mt-6 flex flex-col gap-2">
+            <div className={`flex items-center gap-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+              <AlertCircle size={20} />
+              <span>
+                {isCorrect 
+                  ? `Correct! +${earnedPoints} points` 
+                  : `Wrong! The correct answer was ${question.correctAnswer}`}
+              </span>
+            </div>
+            {lastResponseTime !== undefined && (
+              <div className={`flex items-center gap-2 ${getResponseTimeColor(lastResponseTime)}`}>
+                <Clock size={16} />
+                <span className="text-sm">
+                  You answered in {lastResponseTime.toFixed(1)} seconds
+                  {totalResponseTime > 0 && ` (total ${totalResponseTime.toFixed(1)} seconds)`}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Quick chat for multiplayer */}
       {isMultiplayer && (
         <div className="fixed bottom-4 right-4 flex flex-col items-end">
           <button
             onClick={() => setShowChat(!showChat)}
             className="mb-2 p-3 rounded-full bg-green-600 hover:bg-green-700 text-white transition-colors"
           >
-            {showChat ? <X size={24} /> : <MessageSquare size={24} />}
+            {showChat ? <X size={24} /> : <MessageCircle size={24} />}
           </button>
 
           {showChat && (
             <>
-              {/* Chat messages */}
               <div className="mb-2 w-64 bg-gray-800 rounded-lg p-3 max-h-40 overflow-y-auto">
                 {chatMessages.map((msg) => (
                   <div
@@ -207,12 +255,11 @@ export const QuizGame: React.FC = () => {
                 ))}
               </div>
 
-              {/* Quick chat buttons */}
               <div className="grid grid-cols-2 gap-2 w-64">
                 {quickChatMessages.map(({ emoji, text }) => (
                   <button
                     key={text}
-                    onClick={() => handleQuickChat(`${emoji} ${text}`)}
+                    onClick={() => currentPlayer && addChatMessage(currentPlayer.id, `${emoji} ${text}`)}
                     className="p-2 text-sm bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
                   >
                     {emoji} {text}
@@ -224,7 +271,6 @@ export const QuizGame: React.FC = () => {
         </div>
       )}
 
-      {/* Score display for solo mode */}
       {!isMultiplayer && (
         <div className="mt-6 text-gray-400">
           Score: <span className="text-green-500 font-bold">{currentPlayer?.score || 0}</span>
@@ -233,3 +279,5 @@ export const QuizGame: React.FC = () => {
     </div>
   );
 };
+
+export default QuizGame;

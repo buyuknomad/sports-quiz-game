@@ -25,6 +25,11 @@ export default defineConfig({
           socket: ['socket.io-client']
         }
       }
-    }
+    },
+    sourcemap: false,
+    // Ensure static assets are placed in the correct directory
+    assetsDir: 'assets',
+    // Generate a 404.html that redirects to index.html for SPA routing
+    outDir: 'dist'
   }
 })

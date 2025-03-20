@@ -1,6 +1,6 @@
-// Multiplayer lobby component with ready system and automatic start
+// Enhanced multiplayer lobby component with improved ready system
 import React, { useState } from 'react';
-import { Copy, MessageCircle, Users } from 'lucide-react';
+import { Copy, MessageCircle, Users, Loader2, Clock, Shield, ShieldCheck } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 
 export const MultiplayerLobby: React.FC = () => {
@@ -11,13 +11,16 @@ export const MultiplayerLobby: React.FC = () => {
     mode,
     addChatMessage,
     startCountdown,
-    getCurrentPlayer
+    getCurrentPlayer,
+    waitingForPlayers
   } = useGameStore();
   
   const [message, setMessage] = useState('');
   const currentPlayer = getCurrentPlayer();
   const isHost = players.indexOf(currentPlayer) === 0;
+  const playerCount = players.length;
   const requiredPlayers = mode === '1v1' ? 2 : 2;
+  const allPlayersPresent = playerCount === requiredPlayers;
 
   const copyInviteCode = () => {
     navigator.clipboard.writeText(gameId);
@@ -31,18 +34,23 @@ export const MultiplayerLobby: React.FC = () => {
   };
 
   const handleReady = () => {
-    if (currentPlayer) {
+    if (currentPlayer && allPlayersPresent) {
       setPlayerReady();
     }
   };
 
-  const allPlayersReady = players.length >= requiredPlayers && players.every(p => p.isReady);
+  const isPlayerReady = (playerId: string) => {
+    return players.find(p => p.id === playerId)?.isReady || false;
+  };
+
+  const allPlayersReady = allPlayersPresent && players.every(p => p.isReady);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
       <div className="w-full max-w-2xl bg-gray-800 rounded-lg p-6 shadow-xl">
+        {/* Header with game code */}
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-white">Game Lobby</h2>
+          <h2 className="text-2xl font-bold text-white">1v1 Game Lobby</h2>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -60,21 +68,37 @@ export const MultiplayerLobby: React.FC = () => {
           </div>
         </div>
 
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl text-white flex items-center gap-2">
-              <Users size={24} />
-              Players ({players.length}/{mode === '1v1' ? '2' : '6'})
-            </h3>
-            {currentPlayer && !currentPlayer.isReady && (
-              <button
-                onClick={handleReady}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-              >
-                Ready Up
-              </button>
-            )}
+        {/* Player count indicator */}
+        <div className="mb-6 flex items-center justify-center">
+          <div className="bg-gray-700 rounded-full px-4 py-2 flex items-center gap-2">
+            <Users size={20} className="text-green-400" />
+            <span className="text-white font-medium">
+              {playerCount}/2 Players
+            </span>
           </div>
+        </div>
+
+        {/* Waiting state message */}
+        {waitingForPlayers && (
+          <div className="text-center mb-8 animate-pulse">
+            <div className="flex items-center justify-center gap-3 text-yellow-400">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span className="text-lg font-medium">
+                Waiting for opponent...
+              </span>
+            </div>
+            <p className="text-gray-400 mt-2">
+              Share the game code with your opponent to start
+            </p>
+          </div>
+        )}
+
+        {/* Players list */}
+        <div className="mb-8">
+          <h3 className="text-xl text-white flex items-center gap-2 mb-4">
+            <Users size={24} />
+            Players
+          </h3>
 
           <div className="grid gap-3">
             {players.map((player) => (
@@ -93,17 +117,41 @@ export const MultiplayerLobby: React.FC = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  {player.id === currentPlayer?.id && !player.isReady && allPlayersPresent && (
+                    <button
+                      onClick={handleReady}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white 
+                               rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Shield size={16} />
+                      Ready Up
+                    </button>
+                  )}
                   {player.isReady ? (
-                    <span className="text-green-400">Ready</span>
+                    <span className="text-green-400 flex items-center gap-2">
+                      <ShieldCheck size={16} />
+                      Ready
+                    </span>
                   ) : (
-                    <span className="text-gray-400">Not Ready</span>
+                    <span className="text-gray-400 flex items-center gap-2">
+                      <Shield size={16} />
+                      Not Ready
+                    </span>
                   )}
                 </div>
               </div>
             ))}
+            {waitingForPlayers && (
+              <div className="p-4 rounded-lg bg-gray-700/30 border-2 border-dashed border-gray-600">
+                <div className="text-gray-400 text-center">
+                  Waiting for opponent...
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Chat and status section */}
         <div className="flex flex-col gap-4">
           <div className="flex gap-2">
             <input
@@ -112,30 +160,42 @@ export const MultiplayerLobby: React.FC = () => {
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder="Send a message..."
-              className="flex-1 p-2 rounded bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="flex-1 p-2 rounded bg-gray-700 text-white placeholder-gray-400 
+                       focus:outline-none focus:ring-2 focus:ring-green-500"
+              disabled={waitingForPlayers}
             />
             <button
               onClick={handleSendMessage}
-              className="p-2 rounded bg-green-600 hover:bg-green-700 text-white transition-colors"
+              className={`p-2 rounded text-white transition-colors ${
+                waitingForPlayers ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+              }`}
+              disabled={waitingForPlayers}
             >
               <MessageCircle size={20} />
             </button>
           </div>
 
+          {/* Countdown display */}
           {startCountdown !== null && (
             <div className="text-center">
-              <p className="text-2xl text-green-400 font-bold animate-pulse">
-                Game starting in {startCountdown}...
-              </p>
+              <div className="flex items-center justify-center gap-2 text-2xl text-green-400 font-bold">
+                <Clock className="w-6 h-6 animate-pulse" />
+                <span className="animate-pulse">
+                  Game starting in {startCountdown}...
+                </span>
+              </div>
             </div>
           )}
 
+          {/* Status message */}
           {startCountdown === null && (
             <div className="text-center text-gray-400">
               {allPlayersReady ? (
                 <p>All players ready! Starting game...</p>
-              ) : (
+              ) : allPlayersPresent ? (
                 <p>Waiting for all players to be ready...</p>
+              ) : (
+                <p>Waiting for opponent to join...</p>
               )}
             </div>
           )}

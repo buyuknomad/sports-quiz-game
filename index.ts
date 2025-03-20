@@ -1,4 +1,4 @@
-// Types for the Sports Quiz App
+// Types for the Sports Quiz App with rematch support and answer feedback
 export type GameMode = 'solo' | '1v1' | 'multiplayer';
 export type Category = 'football' | 'basketball' | 'tennis' | 'olympics' | 'mixed';
 
@@ -15,6 +15,10 @@ export interface Player {
   username: string;
   score: number;
   isReady?: boolean;
+  hasFinished?: boolean;
+  isHost?: boolean;
+  rematchReady?: boolean;
+  responseTimes?: number[];
 }
 
 export interface Question {
@@ -37,4 +41,19 @@ export interface GameState {
   isGameEnded: boolean;
   chatMessages: ChatMessage[];
   startCountdown: number | null;
+  finishedPlayers: Set<string>;
+  answeredPlayers: Set<string>;
+  startTime: number;
+  questionStartTimes: number[];
+  questionResponseTimes: number[];
+  playerResponseTimes: Map<string, number[]>;
+  completionTime?: number;
+  isTransitioning: boolean;
+  waitingForPlayers: boolean;
+  currentPlayerId: string;
+  scores: Map<string, number>;
+  selectedAnswer: string | null;
+  isAnswerChecked: boolean;
+  isCorrect: boolean;
+  nextQuestionPending: number | null;
 }

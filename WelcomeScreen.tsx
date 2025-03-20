@@ -1,6 +1,6 @@
-// Welcome screen component with updated game mode selection design
+// Welcome screen component with updated game mode selection design and preserved login state
 import React from 'react';
-import { Trophy, Users2, User } from 'lucide-react';
+import { Trophy, User } from 'lucide-react';
 import type { GameMode } from '../types';
 
 interface WelcomeScreenProps {
@@ -16,7 +16,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         Select Game Mode
       </h1>
       
-      <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-6">
         <button
           onClick={() => onStart(username, 'solo')}
           className="group relative bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 
@@ -50,24 +50,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             </p>
           </div>
         </button>
+      </div>
 
-        <button
-          onClick={() => onStart(username, 'multiplayer')}
-          className="group relative bg-gray-800 rounded-2xl p-8 hover:bg-gray-700 
-                   transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 flex items-center justify-center bg-green-600 
-                          rounded-full group-hover:bg-green-500 transition-colors">
-              <Users2 size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">Multiplayer 🎾</h2>
-            <p className="text-gray-400 text-center text-sm">
-              Compete with up to 6 players
-            </p>
-          </div>
-        </button>
+      <div className="mt-8 text-center">
+        <p className="text-gray-400">
+          Playing as: <span className="text-green-400 font-semibold">{username}</span>
+        </p>
       </div>
     </div>
   );
-};
+}
